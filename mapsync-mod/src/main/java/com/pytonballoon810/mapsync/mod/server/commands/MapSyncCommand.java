@@ -76,7 +76,28 @@ public final class MapSyncCommand {
 					.executes((ctx) -> handleLogs(ctx, 20))
 					.then(Commands.argument("count", IntegerArgumentType.integer(1, 200))
 						.executes((ctx) -> handleLogs(ctx, IntegerArgumentType.getInteger(ctx, "count")))))
+				.then(Commands.literal("rescan")
+					.executes(MapSyncCommand::handleRescan))
 		);
+	}
+
+	private static int handleRescan(
+		final @NotNull CommandContext<CommandSourceStack> ctx
+	) throws CommandSyntaxException {
+		final MapSyncServerState state = requireState();
+		final CommandSourceStack src = ctx.getSource();
+		final int removed;
+		try {
+			removed = state.restartRegionScan(src.getServer());
+		}
+		catch (final Exception e) {
+			src.sendFailure(text("Failed to restart region scan: " + e.getMessage(), ChatFormatting.RED));
+			return 0;
+		}
+		src.sendSuccess(() -> text("Region scan restarted ", ChatFormatting.GREEN)
+			.append(text("(cleared " + removed + " marker(s)). Watch /mapsync status for progress.",
+				ChatFormatting.GRAY)), true);
+		return 1;
 	}
 
 	private static @NotNull MapSyncWsServer requireWsServer() throws CommandSyntaxException {

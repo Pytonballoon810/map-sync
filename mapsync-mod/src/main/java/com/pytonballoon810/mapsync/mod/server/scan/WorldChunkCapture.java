@@ -83,6 +83,22 @@ public final class WorldChunkCapture implements AutoCloseable {
 		return this.queue.size();
 	}
 
+	public int queueCapacity() {
+		return QUEUE_CAPACITY;
+	}
+
+	/// Blocks the calling thread until the queue has drained below
+	/// `targetSize`. Used by [WorldRegionScanner] to back-pressure its
+	/// force-load loop — without this, the scanner outpaces the
+	/// encode-and-store worker by 5–10× and ends up dropping tens of
+	/// thousands of chunks on a real-world scan. Must NOT be invoked
+	/// from the worker thread itself, which would deadlock.
+	public void awaitQueueSpace(final int targetSize) throws InterruptedException {
+		while (this.queue.size() > targetSize) {
+			Thread.sleep(50L);
+		}
+	}
+
 	@Override
 	public void close() {
 		this.worker.interrupt();

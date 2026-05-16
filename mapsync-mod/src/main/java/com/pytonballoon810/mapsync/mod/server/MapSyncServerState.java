@@ -126,6 +126,35 @@ public final class MapSyncServerState implements AutoCloseable {
 		return this.regionScanner;
 	}
 
+	/// Wipes the per-dimension scan markers and spawns a fresh
+	/// {@link WorldRegionScanner}. Returns the number of marker files
+	/// removed. Operators trigger this via `/mapsync rescan` after the
+	/// previous scan dropped chunks (queue overflow on undersized
+	/// throttle) or pointed at the wrong region directory.
+	public synchronized int restartRegionScan(final @NotNull MinecraftServer server) throws java.io.IOException {
+		int removed = 0;
+		if (java.nio.file.Files.isDirectory(this.dataDir)) {
+			try (final var stream = java.nio.file.Files.list(this.dataDir)) {
+				final var markers = stream
+					.filter((p) -> p.getFileName().toString().startsWith(".world-scanned-"))
+					.toList();
+				for (final var marker : markers) {
+					try {
+						java.nio.file.Files.deleteIfExists(marker);
+						removed++;
+					}
+					catch (final java.io.IOException e) {
+						logger.warn("Failed to delete scan marker {}", marker, e);
+					}
+				}
+			}
+		}
+		final WorldRegionScanner scanner = new WorldRegionScanner(server, this);
+		this.regionScanner = scanner;
+		scanner.start();
+		return removed;
+	}
+
 	/// Arms the CHUNK_LOAD capture hook and (on first run per dimension)
 	/// kicks off the background region-file scanner. Called from
 	/// SERVER_STARTED — by then the server has all dimensions constructed

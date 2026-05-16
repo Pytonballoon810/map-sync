@@ -50,13 +50,10 @@ public final class WorldRegionScanner {
 	private static final @NotNull MsServerLog logger = MsServerLog.get(WorldRegionScanner.class);
 	private static final @NotNull Pattern MCA_NAME =
 		Pattern.compile("r\\.(-?\\d+)\\.(-?\\d+)\\.mca");
-	/// Throttle between chunk-load requests. Each call already blocks on
-	/// the main thread's chunk-load pipeline, so this is mostly to keep
-	/// the scanner from monopolising the main-thread dispatch queue when
-	/// no players are connected (which would otherwise process scan
-	/// requests as fast as physically possible and stall any incoming
-	/// player connections).
-	private static final long PER_CHUNK_SLEEP_MS = 2L;
+	// Per-chunk throttling is now driven by the capture worker's queue
+	// depth (see `awaitQueueSpace` below) rather than a fixed sleep —
+	// without back-pressure the scanner outruns the encode-and-store
+	// worker and drops tens of thousands of chunks on big worlds.
 
 	public sealed interface Status permits Status.Idle, Status.Scanning, Status.Done, Status.Failed {
 		record Idle() implements Status {
@@ -166,12 +163,24 @@ public final class WorldRegionScanner {
 			if (present == null) {
 				continue;
 			}
+			// Half-queue back-pressure target so the capture worker has
+			// breathing room to drain while the scanner sleeps. Lower
+			// than the full capacity to avoid the brief race where
+			// `awaitQueueSpace` returns just as the queue fills again.
+			final int backPressureTarget = this.state.chunkCapture().queueCapacity() / 2;
 			for (int i = 0; i < present.length; i++) {
 				if (!present[i]) continue;
 				final int localX = i & 31;
 				final int localZ = (i >> 5) & 31;
 				final int cx = (rx << 5) | localX;
 				final int cz = (rz << 5) | localZ;
+				// Wait if the capture worker is falling behind. Pinning
+				// the producer rate to the consumer rate is the only way
+				// to avoid the bounded queue dropping chunks under
+				// sustained load; the explicit per-chunk sleep on its
+				// own can't anticipate the worker's actual encode-and-
+				// store latency on this particular machine.
+				this.state.chunkCapture().awaitQueueSpace(backPressureTarget);
 				try {
 					level.getChunk(cx, cz, ChunkStatus.FULL, true);
 					requested++;
@@ -183,9 +192,6 @@ public final class WorldRegionScanner {
 				catch (final Throwable t) {
 					logger.warn("Force-load of ({},{}) in {} failed",
 						cx, cz, level.dimension().identifier(), t);
-				}
-				if (PER_CHUNK_SLEEP_MS > 0) {
-					Thread.sleep(PER_CHUNK_SLEEP_MS);
 				}
 			}
 		}
