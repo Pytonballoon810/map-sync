@@ -24,7 +24,8 @@ abstract class JsonConfig {
 
 	protected abstract void resetToDefaults();
 
-	/// Doesn't save any newly created config; for that, call `saveNow()`.
+	/// Returns the config loaded from disk, or a freshly-defaulted one
+	/// (written to disk before returning) if the file didn't exist.
 	protected static <T extends JsonConfig> @NotNull T load(
 		final @NotNull File configFile,
 		final @NotNull Class<T> configClass
@@ -35,7 +36,7 @@ abstract class JsonConfig {
 		try (final var reader = new FileReader(configFile)) {
 			config = GSON.fromJson(reader, configClass);
 			config.configFile = configFile;
-			LOGGER.info("Loaded existing {}", configFile);
+			LOGGER.debug("Loaded existing {}", configFile);
 			return config;
 		}
 		catch (final FileNotFoundException ignored) {}
@@ -47,6 +48,7 @@ abstract class JsonConfig {
 			config.configFile = configFile;
 			config.resetToDefaults();
 			LOGGER.info("Created default {}", configFile);
+			config.save();
 			return config;
 		}
 		catch (final ReflectiveOperationException e) {
@@ -54,9 +56,14 @@ abstract class JsonConfig {
 		}
 	}
 
+	/// Atomically rewrites the config file with the in-memory state. The
+	/// log is at DEBUG because callers fire this on routine UI events
+	/// (every GUI checkbox toggle, every Connect button click, every
+	/// auto-discovery payload arrival); echoing each at INFO buries the
+	/// rest of the launcher log under "Saving ServerConfig" lines.
 	synchronized
 	public void save() {
-		LOGGER.info("Saving {} to {}", getClass().getSimpleName(), this.configFile);
+		LOGGER.debug("Saving {} to {}", getClass().getSimpleName(), this.configFile);
 		try {
 			Files.createDirectories(this.configFile.getParentFile().toPath());
 			Files.write(

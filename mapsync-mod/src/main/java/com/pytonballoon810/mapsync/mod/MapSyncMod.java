@@ -68,8 +68,11 @@ public final class MapSyncMod {
 		KeyMappingHelper.registerKeyMapping(OPEN_GUI_KEY);
 		SyncAddressClientHandler.register();
 
+		// load() already writes the file when it doesn't exist (via
+		// resetToDefaults + saveNow in JsonConfig.load), so a separate
+		// unconditional save here just adds a redundant "Saving …" line
+		// to every launch.
 		modConfig = ModConfig.load();
-		modConfig.save(); // creates the default file if it doesn't exist yet
 
 		ClientTickEvents.START_CLIENT_TICK.register((minecraft) -> {
 			final GameContext gameContext = GameContext.get().orElse(null);
