@@ -147,7 +147,10 @@ public final class SyncConnectionsGui extends Screen {
 		int top = this.offsetTop;
 		guiGraphics.centeredText(this.font, this.title, this.width / 2, top, 0xFF_FF_FF);
 
-		top += 70;
+		// Push the status block below the Preserve-existing-map-data checkbox,
+		// which sits at offsetTop + 70 and would otherwise occlude every text
+		// line drawn here.
+		top += 95;
 		if (this.gameContext.getDimensionState().orElse(null) instanceof final DimensionState dimensionState) {
 			guiGraphics.text(
 				this.font,
