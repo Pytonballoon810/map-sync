@@ -80,5 +80,10 @@ jobs:
           loaders: "fabric"
           game-versions: "26.1.2"
           java: "25"
+          # Modrinth's API requires base62 project IDs in dependency
+          # entries, not slugs — passing `fabric-api` directly gives:
+          # `Invalid character '-' in base62 encoding`. The `{modrinth:ID}`
+          # override resolves the slug to its 8-char ID at upload time.
+          # fabric-api: https://modrinth.com/mod/fabric-api → P7dR8mSH
           dependencies: |
-            fabric-api(required)
+            fabric-api(required){modrinth:P7dR8mSH}
