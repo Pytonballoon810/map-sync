@@ -41,4 +41,9 @@ public final class MagicValues {
 
 	// https://www.rfc-editor.org/rfc/rfc6455#section-7.4.1
 	public static final int CLOSE_CODE_KICKED = 4001;
+	/// Sent by the server when the client's reported `modVersion` in the
+	/// handshake doesn't match the server's `MagicValues.VERSION`. The
+	/// WebSocket `reason` string carries the server's version so the
+	/// client can show the user what to update to.
+	public static final int CLOSE_CODE_VERSION_MISMATCH = 4002;
 }

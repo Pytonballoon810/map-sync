@@ -184,7 +184,14 @@ public final class ProtocolHandler {
 			return;
 		}
 		if (!MagicValues.VERSION.equals(packet.modVersion())) {
-			client.kick("unsupported mod version: " + packet.modVersion());
+			// Use a dedicated close code + reason so the client can
+			// distinguish a version mismatch from a generic kick and
+			// stop retrying / surface a meaningful message to the
+			// player. The reason string carries the server's version
+			// so the user knows what they need to update to.
+			logger.info("[{}] rejecting client with mod version {} (server requires {})",
+				client.name(), packet.modVersion(), MagicValues.VERSION);
+			client.closeWithReason(MagicValues.CLOSE_CODE_VERSION_MISMATCH, MagicValues.VERSION);
 			return;
 		}
 		client.gameAddress = packet.gameAddress().address();

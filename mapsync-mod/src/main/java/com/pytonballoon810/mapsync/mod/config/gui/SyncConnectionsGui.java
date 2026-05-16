@@ -236,6 +236,12 @@ public final class SyncConnectionsGui extends Screen {
 					statusColor = 0xFF88ff88;
 					statusText += " Connected and authed";
 				}
+				case VERSION_MISMATCH -> {
+					statusColor = 0xFFff8888;
+					statusText += " disabled — server needs MapSync "
+						+ client.incompatibleServerVersion
+						+ ", you have " + com.pytonballoon810.mapsync.mod.utils.MagicValues.VERSION;
+				}
 				default -> {
 					statusColor = 0xFFFFFF00;
 					statusText += " Unknown state: " + connectionState;

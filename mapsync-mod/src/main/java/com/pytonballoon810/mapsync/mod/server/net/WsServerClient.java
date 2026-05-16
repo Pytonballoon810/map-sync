@@ -121,4 +121,19 @@ public final class WsServerClient {
 		logger.info("[{}] kicking: {}", this.name(), internalReason);
 		this.conn.close(MagicValues.CLOSE_CODE_KICKED);
 	}
+
+	/// Closes the connection with a specific WebSocket close code and a
+	/// reason string the client receives. Use this when the client
+	/// needs to distinguish *why* the connection was rejected — e.g.
+	/// version-mismatch close uses a dedicated code so the client can
+	/// stop retrying and tell the player what version is required.
+	public void closeWithReason(
+		final int closeCode,
+		final @NotNull String reason
+	) {
+		if (!this.conn.isOpen()) {
+			return;
+		}
+		this.conn.close(closeCode, reason);
+	}
 }

@@ -13,6 +13,7 @@ import com.pytonballoon810.mapsync.mod.net.buffers.BufferReader;
 import com.pytonballoon810.mapsync.mod.net.buffers.BufferWriter;
 import com.pytonballoon810.mapsync.mod.net.packet.ChunkTilePacket;
 import com.pytonballoon810.mapsync.mod.sync.GameContext;
+import com.pytonballoon810.mapsync.mod.utils.MagicValues;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URI;
@@ -21,9 +22,12 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
+import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.ChunkPos;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,6 +74,12 @@ public class SyncClient {
 	/// can be set to true again later.
 	public boolean shouldReconnect = true;
 	public volatile String lastError = null;
+	/// Non-null when the server kicked us during handshake with
+	/// `CLOSE_CODE_VERSION_MISMATCH`. Holds the server's reported
+	/// version string. While set, [#state] returns
+	/// {@link ConnectionState#VERSION_MISMATCH} and the GUI shows a
+	/// disabled / incompatible state instead of a connection attempt.
+	public volatile @Nullable String incompatibleServerVersion = null;
 
 	public final AuthStateHolder authState = new AuthStateHolder();
 
@@ -87,8 +97,11 @@ public class SyncClient {
 		return "Client%d".formatted(this.clientId);
 	}
 
-	public enum ConnectionState { DISCONNECTED, CONNECTED, WELCOMED }
+	public enum ConnectionState { DISCONNECTED, CONNECTED, WELCOMED, VERSION_MISMATCH }
 	public synchronized @NotNull ConnectionState state() {
+		if (this.incompatibleServerVersion != null) {
+			return ConnectionState.VERSION_MISMATCH;
+		}
 		return switch (this.websocket.getReadyState()) {
 			case NOT_YET_CONNECTED, CLOSING, CLOSED -> ConnectionState.DISCONNECTED;
 			case OPEN -> switch (this.authState.get()) {
@@ -134,10 +147,35 @@ public class SyncClient {
 			final boolean wasKicked
 		) {
 			LOGGER.info("[{}] Closing... {}:{} (kicked: {})", SyncClient.this.name(), closeCode, reason, wasKicked);
-			if (wasKicked) {
+			if (closeCode == MagicValues.CLOSE_CODE_VERSION_MISMATCH) {
+				// Server's MapSync version differs from ours. The `reason`
+				// string carries the server's version. Stop retrying and
+				// surface a chat message — the connection will never
+				// succeed until one side updates.
 				SyncClient.this.shouldReconnect = false;
+				SyncClient.this.incompatibleServerVersion = reason;
+				final String message = String.format(
+					"MapSync disabled for %s: server requires version %s, you have %s",
+					SyncClient.this.syncAddress,
+					reason,
+					MagicValues.VERSION
+				);
+				SyncClient.this.lastError = message;
+				LOGGER.warn("[{}] {}", SyncClient.this.name(), message);
+				final Minecraft mc = Minecraft.getInstance();
+				mc.execute(() -> {
+					if (mc.player != null) {
+						mc.player.sendSystemMessage(Component.literal(message));
+					}
+				});
 			}
-			SyncClient.this.lastError = null;
+			else if (wasKicked) {
+				SyncClient.this.shouldReconnect = false;
+				SyncClient.this.lastError = null;
+			}
+			else {
+				SyncClient.this.lastError = null;
+			}
 			MapSyncMod.handleSyncDisconnection(SyncClient.this, new CloseContext.Closed(closeCode, reason));
 		}
 
