@@ -20,7 +20,7 @@ tasks {
 		exclude("org/slf4j/**", "META-INF/maven/org.slf4j/**")
 		relocate(
 			"org.java_websocket",
-			"gjum.minecraft.mapsync.mod.deps.websockets"
+			"com.pytonballoon810.mapsync.mod.deps.websockets"
 		)
 	}
 }

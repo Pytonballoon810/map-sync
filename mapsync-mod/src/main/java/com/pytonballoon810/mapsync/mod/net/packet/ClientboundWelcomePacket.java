@@ -1,0 +1,29 @@
+package com.pytonballoon810.mapsync.mod.net.packet;
+
+import com.pytonballoon810.mapsync.mod.net.Packet;
+import com.pytonballoon810.mapsync.mod.net.buffers.BufferReader;
+import com.pytonballoon810.mapsync.mod.net.buffers.BufferWriter;
+import org.jetbrains.annotations.NotNull;
+
+/// This is sent by the server to indicate a successful connection. The client should then inform the server of its
+/// current dimension via [ServerboundDimensionChangePacket], after which the client can begin sending chunk data for
+/// that dimension.
+///
+/// - Prev: [ServerboundIdentityResponsePacket]
+/// - Next: [ServerboundDimensionChangePacket]
+public record ClientboundWelcomePacket() implements Packet {
+	public static final int PACKET_ID = 9;
+
+	public static @NotNull Packet read(
+		final @NotNull BufferReader reader
+	) throws Exception {
+		return new ClientboundWelcomePacket();
+	}
+
+	@Override
+	public void write(
+		final @NotNull BufferWriter writer
+	) throws Exception {
+		// no payload
+	}
+}

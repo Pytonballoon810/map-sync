@@ -1,9 +1,9 @@
 {
 	"required": true,
 	"minVersion": "0.8",
-	"package": "gjum.minecraft.mapsync.mod.mixins",
+	"package": "com.pytonballoon810.mapsync.mod.mixins",
 	"compatibilityLevel": "JAVA_25",
-	"plugin": "gjum.minecraft.mapsync.mod.MixinManager",
+	"plugin": "com.pytonballoon810.mapsync.mod.MixinManager",
 	"client": [
 		"voxelmap.CachedRegionAccessor",
 		"voxelmap.PersistentMapAccessor",

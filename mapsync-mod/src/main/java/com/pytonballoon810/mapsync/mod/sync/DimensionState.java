@@ -1,0 +1,131 @@
+package com.pytonballoon810.mapsync.mod.sync;
+
+import static com.pytonballoon810.mapsync.mod.MapSyncMod.debugLog;
+
+import com.pytonballoon810.mapsync.mod.data.CatchupChunk;
+import com.pytonballoon810.mapsync.mod.data.ChunkTile;
+import com.pytonballoon810.mapsync.mod.data.GameAddress;
+import com.pytonballoon810.mapsync.mod.data.RegionPos;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
+import net.minecraft.client.Minecraft;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
+import org.jetbrains.annotations.NotNull;
+
+/**
+ * contains any background processes and data structures, to be able to easily tear down when leaving the dimension
+ */
+public class DimensionState {
+	private static final Minecraft mc = Minecraft.getInstance();
+
+	public final ResourceKey<Level> dimension;
+	boolean hasShutDown = false;
+
+	private final DimensionChunkMeta chunkMeta;
+	private final RenderQueue renderQueue;
+	private final CatchupLogic catchup;
+	private int numChunksReceived = 0;
+	private int numChunksRendered = 0;
+	private final AtomicReference<XaeroBackfillStatus> backfillStatus =
+		new AtomicReference<>(new XaeroBackfillStatus.NotNeeded("pending"));
+
+	DimensionState(GameAddress gameAddress, ResourceKey<Level> dimension) {
+		this.dimension = dimension;
+		chunkMeta = new DimensionChunkMeta(gameAddress, dimension.identifier());
+		renderQueue = new RenderQueue(this);
+		catchup = new CatchupLogic(this);
+		// One-shot import of Xaero region-cache mtimes into chunkMeta. No-op
+		// if a marker file from a previous session is already present, or if
+		// Xaero isn't installed. Status flows into backfillStatus so the
+		// MapSync GUI can render progress.
+		XaeroMtimeBackfill.runIfNeeded(chunkMeta, this.backfillStatus::set);
+	}
+
+	public synchronized void shutDown() {
+		if (hasShutDown) return;
+		hasShutDown = true;
+		renderQueue.shutDown();
+	}
+
+	public long getOldestChunkTsInRegion(RegionPos regionPos) {
+		return chunkMeta.getOldestChunkTsInRegion(regionPos);
+	}
+
+	public long getChunkTimestamp(ChunkPos chunkPos) {
+		return chunkMeta.getTimestamp(chunkPos);
+	}
+
+	public void setChunkTimestamp(ChunkPos chunkPos, long timestamp) {
+		chunkMeta.setTimestamp(chunkPos, timestamp);
+	}
+
+	public void PurgeRegionTimeStamps() { chunkMeta.purgeRegionTimestamps(); }
+
+	public int getNumChunksReceived() {
+		return numChunksReceived;
+	}
+
+	public int getNumChunksRendered() {
+		return numChunksRendered;
+	}
+
+	public int getRenderQueueSize() {
+		return renderQueue.getQueueSize();
+	}
+
+	public long getTrackedChunkCount() {
+		return this.chunkMeta.getTrackedChunkCount();
+	}
+
+	public int getLoadedRegionCount() {
+		return this.chunkMeta.getLoadedRegionCount();
+	}
+
+	public @NotNull XaeroBackfillStatus getBackfillStatus() {
+		return this.backfillStatus.get();
+	}
+
+	public void addCatchupChunks(List<CatchupChunk> catchupChunks) {
+		catchup.addCatchupChunks(catchupChunks);
+	}
+
+	public void processSharedChunk(ChunkTile chunkTile) {
+		if (hasShutDown) return;
+		if (mc.level == null) return;
+		if (dimension != mc.level.dimension()) {
+			debugLog("Dropping chunk tile: mc changed dimension");
+			shutDown(); // player entered different dimension
+			return;
+		}
+
+		if (chunkTile.dimension() != dimension) {
+			debugLog("Dropping chunk tile: wrong dimension "
+					+ chunkTile.dimension() + " wanted " + dimension);
+			return; // don't render tile to the wrong dimension
+		}
+
+		++numChunksReceived;
+
+		catchup.handleSharedChunkReceived(chunkTile);
+
+		if (mc.level.getChunkSource().hasChunk(chunkTile.x(), chunkTile.z())) {
+			// don't update loaded chunks
+			debugLog("Dropping chunk tile: loaded in world");
+			++numChunksRendered; // count skipped(loaded) chunks too so the "received" vs "rendered" count matches up
+			return;
+		}
+
+		renderQueue.renderLater(chunkTile);
+	}
+
+	public void onChunkRenderDone(ChunkTile chunkTile) {
+		catchup.maybeRequestMoreCatchup();
+		++numChunksRendered;
+	}
+
+	public void onTick() {
+		catchup.maybeRequestMoreCatchup();
+	}
+}

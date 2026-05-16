@@ -1,0 +1,47 @@
+package com.pytonballoon810.mapsync.mod.net.packet;
+
+import com.pytonballoon810.mapsync.mod.data.RegionTimestamp;
+import com.pytonballoon810.mapsync.mod.net.Packet;
+import com.pytonballoon810.mapsync.mod.net.buffers.BufferReader;
+import com.pytonballoon810.mapsync.mod.net.buffers.BufferWriter;
+import com.pytonballoon810.mapsync.mod.utils.Assertions;
+import org.jetbrains.annotations.NotNull;
+
+/// This is the packet for the first-stage of the synchronisation process. It's sent immediately after you've been
+/// authenticated. You should respond with a [ServerboundChunkTimestampsRequestPacket].
+///
+/// - Next: [ServerboundChunkTimestampsRequestPacket]
+public record ClientboundRegionTimestampsPacket(
+	@NotNull String dimension,
+	@NotNull RegionTimestamp timestamp
+) implements Packet {
+	public static final int PACKET_ID = 7;
+
+	public ClientboundRegionTimestampsPacket {
+		Assertions.assertNotNull(dimension);
+		Assertions.assertNotNull(timestamp);
+	}
+
+	public static @NotNull Packet read(
+		final @NotNull BufferReader reader
+	) throws Exception {
+		return new ClientboundRegionTimestampsPacket(
+			reader.readString(),
+			new RegionTimestamp(
+				(short) reader.readInt16(),
+				(short) reader.readInt16(),
+				reader.readInt64()
+			)
+		);
+	}
+
+	@Override
+	public void write(
+		final @NotNull BufferWriter writer
+	) throws Exception {
+		writer.writeString(this.dimension());
+		writer.writeInt16(this.timestamp().x());
+		writer.writeInt16(this.timestamp().z());
+		writer.writeInt64(this.timestamp().timestamp());
+	}
+}

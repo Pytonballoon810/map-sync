@@ -15,13 +15,13 @@
 	"environment": "*",
 	"entrypoints": {
 		"client": [
-			"gjum.minecraft.mapsync.mod.MapSyncMod::bootstrap"
+			"com.pytonballoon810.mapsync.mod.MapSyncMod::bootstrap"
 		],
 		"main": [
-			"gjum.minecraft.mapsync.mod.server.MapSyncServerMod::bootstrap"
+			"com.pytonballoon810.mapsync.mod.server.MapSyncServerMod::bootstrap"
 		],
 		"modmenu": [
-			"gjum.minecraft.mapsync.mod.integrations.modmenu.ModMenuIntegration"
+			"com.pytonballoon810.mapsync.mod.integrations.modmenu.ModMenuIntegration"
 		]
 	},
 	"depends": {

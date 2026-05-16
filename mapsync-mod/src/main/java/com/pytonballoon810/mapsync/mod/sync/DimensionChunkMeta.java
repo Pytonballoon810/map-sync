@@ -1,0 +1,193 @@
+package com.pytonballoon810.mapsync.mod.sync;
+
+import com.pytonballoon810.mapsync.mod.data.GameAddress;
+import com.pytonballoon810.mapsync.mod.data.RegionPos;
+import com.pytonballoon810.mapsync.mod.utils.Assertions;
+import com.pytonballoon810.mapsync.mod.utils.MagicValues;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.level.ChunkPos;
+import org.apache.commons.io.FileUtils;
+import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Stores each chunk's timestamp of when it was received from mc.
+ * Persists them grouped by region at `.minecraft/MapSync/cache/{mcServerName}/{dimensionName}/r{x},{z}.chunkmeta`.
+ * Each region's LastModifiedTime is set to the oldest contained chunk (or 0 if any chunks are absent), to easily find regions to request from the sync server.
+ */
+public class DimensionChunkMeta {
+	private static final Logger LOGGER = LoggerFactory.getLogger(DimensionChunkMeta.class);
+	public static final long NULLISH_TIMESTAMP = Long.MIN_VALUE;
+
+	public final GameAddress gameAddress;
+	private final Path dimensionDirPath;
+	private final Map<RegionPos, long[]> regionsTimestamps;
+	// Running count of non-NULLISH chunk timestamps across regions currently
+	// held in memory. Maintained at every mutation so the GUI can read it in
+	// O(1) instead of scanning regions * 1024 entries per frame.
+	private long nonNullishCount = 0L;
+
+	DimensionChunkMeta(
+		final @NotNull GameAddress gameAddress,
+		final @NotNull Identifier dimension
+	) {
+		this.gameAddress = gameAddress;
+		this.dimensionDirPath = FabricLoader.getInstance()
+			.getGameDir()
+			.resolve("data")
+			.resolve("MapSync")
+			.resolve(gameAddress.asFsName())
+			.resolve(dimension.toString().replace(":", "~"));
+		this.regionsTimestamps = new ConcurrentHashMap<>();
+	}
+
+	public synchronized long getOldestChunkTsInRegion(RegionPos regionPos) {
+		long[] chunkTimestamps = regionsTimestamps.computeIfAbsent(regionPos, this::readRegionTimestampsFile);
+		return Arrays.stream(chunkTimestamps).min().orElse(0);
+	}
+
+	public synchronized long getTimestamp(ChunkPos chunkPos) {
+		final var regionPos = RegionPos.forChunkPos(chunkPos);
+		final long[] regionTimestamps = regionsTimestamps.computeIfAbsent(regionPos, this::readRegionTimestampsFile);
+		final int chunkNr = RegionPos.chunkIndex(chunkPos);
+		return regionTimestamps[chunkNr];
+	}
+
+	public synchronized void setTimestamp(ChunkPos chunkPos, long timestamp) {
+		final var regionPos = RegionPos.forChunkPos(chunkPos);
+		final long[] regionTimestamps = regionsTimestamps.computeIfAbsent(regionPos, this::readRegionTimestampsFile);
+		final int chunkNr = RegionPos.chunkIndex(chunkPos);
+		final long previous = regionTimestamps[chunkNr];
+		if (previous == NULLISH_TIMESTAMP && timestamp != NULLISH_TIMESTAMP) {
+			this.nonNullishCount++;
+		}
+		else if (previous != NULLISH_TIMESTAMP && timestamp == NULLISH_TIMESTAMP) {
+			this.nonNullishCount--;
+		}
+		regionTimestamps[chunkNr] = timestamp;
+		writeRegionTimestampsFile(regionPos, regionTimestamps);
+	}
+
+	/// Fills every chunk slot in this region with the same timestamp and
+	/// writes the region file once. Used by the one-shot Xaero-mtime
+	/// backfill — calling setTimestamp 1024 times per region would rewrite
+	/// the file 1024 times, while a player's full Xaero cache can run into
+	/// thousands of regions.
+	///
+	/// Existing per-chunk timestamps for NULLISH slots are overwritten with
+	/// the new baseline; non-NULLISH slots are preserved so a chunk already
+	/// touched by the live MapSync session (real explore time) wins over
+	/// the file-mtime baseline.
+	public synchronized void bulkSetRegionTimestamp(
+		final @NotNull RegionPos regionPos,
+		final long timestamp
+	) {
+		final long[] regionTimestamps = regionsTimestamps.computeIfAbsent(regionPos, this::readRegionTimestampsFile);
+		int filled = 0;
+		for (int i = 0; i < regionTimestamps.length; i++) {
+			if (regionTimestamps[i] == NULLISH_TIMESTAMP) {
+				regionTimestamps[i] = timestamp;
+				filled++;
+			}
+		}
+		if (filled > 0) {
+			this.nonNullishCount += filled;
+			writeRegionTimestampsFile(regionPos, regionTimestamps);
+		}
+	}
+
+	/// Per-dimension data directory. Exposed so the backfill runner can drop
+	/// its `.xaero-backfilled` marker next to the chunkmeta files without
+	/// having to recompute the path scheme.
+	public @NotNull Path getDimensionDirPath() {
+		return this.dimensionDirPath;
+	}
+
+	// Only call this to clear memory and file-cache
+	public synchronized void purgeRegionTimestamps() {
+		this.regionsTimestamps.clear();
+		this.nonNullishCount = 0L;
+		try {
+			FileUtils.deleteDirectory(this.dimensionDirPath.toFile());
+		}
+		catch (final IOException e) {
+			LOGGER.warn("Failed to purge region timestamps!", e);
+		}
+	}
+
+	/// O(1) snapshot of chunks currently carrying a non-NULLISH timestamp,
+	/// across every region loaded into memory. Surfaced by the GUI as
+	/// "tracked chunks". Note: regions on disk that haven't been touched
+	/// yet don't count until something reads them in.
+	public synchronized long getTrackedChunkCount() {
+		return this.nonNullishCount;
+	}
+
+	/// Number of region timestamp arrays currently held in memory. Useful
+	/// in the GUI alongside [getTrackedChunkCount] to give a sense of how
+	/// much of the world's metadata MapSync has lazily loaded.
+	public synchronized int getLoadedRegionCount() {
+		return this.regionsTimestamps.size();
+	}
+
+	private long @NotNull [] readRegionTimestampsFile(
+		final @NotNull RegionPos regionPos
+	) {
+		final var timestamps = new long[RegionPos.CHUNKS_IN_REGION];
+		Arrays.fill(timestamps, NULLISH_TIMESTAMP);
+		try {
+			final byte[] bytes = Files.readAllBytes(this.dimensionDirPath.resolve(getRegionFileName(regionPos)));
+			Assertions.assertLength(bytes.length, Long.BYTES * timestamps.length);
+			ByteBuffer.wrap(bytes).asLongBuffer().get(timestamps);
+		}
+		catch (final FileNotFoundException | NoSuchFileException ignored) {}
+		catch (final Exception e) {
+			LOGGER.warn("Failed to read region timestamps file for {}", regionPos, e);
+		}
+		// Seed the running counter with whatever this region brought in. This
+		// runs inside `computeIfAbsent` so the caller is already holding the
+		// instance lock; no extra synchronization needed.
+		for (final long ts : timestamps) {
+			if (ts != NULLISH_TIMESTAMP) {
+				this.nonNullishCount++;
+			}
+		}
+		return timestamps;
+	}
+
+	private synchronized void writeRegionTimestampsFile(
+		final @NotNull RegionPos regionPos,
+		final long @NotNull [] timestamps
+	) {
+		Assertions.assertLength(timestamps.length, MagicValues.REGION_GRID);
+		final var bytes = new byte[Long.BYTES * timestamps.length];
+		ByteBuffer.wrap(bytes).asLongBuffer().put(timestamps);
+		try {
+			Files.createDirectories(this.dimensionDirPath);
+			Files.write(this.dimensionDirPath.resolve(getRegionFileName(regionPos)), bytes);
+		}
+		catch (final IOException e) {
+			LOGGER.warn("Failed to write region timestamps file for {}", regionPos, e);
+		}
+	}
+
+	private @NotNull String getRegionFileName(
+		final @NotNull RegionPos regionPos
+	) {
+		return "r%d,%d.chunkmeta".formatted(
+			regionPos.x(),
+			regionPos.z()
+		);
+	}
+}
