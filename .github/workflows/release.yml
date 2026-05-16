@@ -1,9 +1,10 @@
 name: "Release"
 
-# Fires only on tags shaped `v*` (e.g. v2.2.0, v2.2.0-rc1). Branch pushes
-# go through build-mod.yml — keeping CI and release as separate workflows
-# avoids the path-filter interaction that would otherwise skip the release
-# whenever a tag points at a commit that didn't touch mapsync-mod/.
+# Fires only on tags shaped `v*` (e.g. v26.1.2, v26.1.2-rc1). Branch
+# pushes go through build-mod.yml — keeping CI and release as separate
+# workflows avoids the path-filter interaction that would otherwise skip
+# the release whenever a tag points at a commit that didn't touch
+# mapsync-mod/.
 on:
   push:
     tags:
@@ -28,12 +29,56 @@ jobs:
         run: "./gradlew build"
         working-directory: "./mapsync-mod"
 
+      # Derive release flavor from the tag suffix so a single tag drives both
+      # the GitHub release's prerelease flag and Modrinth's version channel.
+      # Convention: vX.Y.Z = stable, *-rc* / *-beta* = beta, *-alpha* = alpha.
+      - name: "Determine release flavor"
+        id: "flavor"
+        run: |
+          tag="${{ github.ref_name }}"
+          case "$tag" in
+            *-alpha*)
+              echo "type=alpha"      >> "$GITHUB_OUTPUT"
+              echo "prerelease=true" >> "$GITHUB_OUTPUT"
+              ;;
+            *-beta*|*-rc*)
+              echo "type=beta"       >> "$GITHUB_OUTPUT"
+              echo "prerelease=true" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "type=release"     >> "$GITHUB_OUTPUT"
+              echo "prerelease=false" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+
       - name: "Create GitHub Release"
         uses: "softprops/action-gh-release@v2"
         with:
           fail_on_unmatched_files: true
           generate_release_notes: true
+          prerelease: ${{ steps.flavor.outputs.prerelease == 'true' }}
           files: |
             mapsync-mod/dist/*.jar
         env:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+
+      # Skips itself when MODRINTH_PROJECT_ID is unset so anyone forking
+      # this repo doesn't get a broken workflow until they set up their
+      # own Modrinth project. Requires repo variable MODRINTH_PROJECT_ID
+      # (the project slug or ID) and repo secret MODRINTH_TOKEN (a PAT
+      # with the "Create versions" scope).
+      - name: "Publish to Modrinth"
+        if: vars.MODRINTH_PROJECT_ID != ''
+        uses: "Kir-Antipov/mc-publish@v3.3"
+        with:
+          modrinth-id: ${{ vars.MODRINTH_PROJECT_ID }}
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          files: "mapsync-mod/dist/*.jar"
+          name: "MapSync ${{ github.ref_name }}"
+          version: ${{ github.ref_name }}
+          version-type: ${{ steps.flavor.outputs.type }}
+          loaders: "fabric"
+          game-versions: "26.1.2"
+          java: "25"
+          dependencies: |
+            fabric-api(required)
