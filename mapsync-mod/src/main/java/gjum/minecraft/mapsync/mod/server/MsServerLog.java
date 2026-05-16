@@ -59,7 +59,15 @@ public final class MsServerLog {
 	private MsServerLog() {
 	}
 
+	/// Logger names are prefixed with `mapsync.` to claim an exclusive
+	/// portion of Log4j's logger registry — class-named loggers can be
+	/// pre-created by anyone scanning the classpath (Log4j's plugin
+	/// scanner, mixin instrumentation, etc.) with the default factory,
+	/// and Log4j refuses to swap factories on an already-registered
+	/// logger. Our prefix sidesteps that race entirely. The console's
+	/// short-name pattern (%c{1}) still renders as `MapSyncServerMod`
+	/// because it takes the rightmost dotted component.
 	public static @NotNull Logger get(final @NotNull Class<?> clazz) {
-		return LogManager.getLogger(clazz, FACTORY);
+		return LogManager.getLogger("mapsync." + clazz.getName(), FACTORY);
 	}
 }
