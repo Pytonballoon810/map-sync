@@ -223,8 +223,13 @@ public class SyncClient {
 		try {
 			this.websocket.send(packetBytes);
 		}
-		catch (final WebsocketNotConnectedException e) {
-			LOGGER.warn("[{}] Dropping packet[{}] as websocket is not connected!", this.name(), packet.getClass().getSimpleName(), e);
+		catch (final WebsocketNotConnectedException ignored) {
+			// Close race: the websocket dropped between the readyState read
+			// in the dispatcher above and the actual write call here.
+			// Expected during reconnects and dimension switches — log at
+			// debug without a stack trace so it doesn't drown the console.
+			LOGGER.debug("[{}] Dropping packet[{}] as websocket is not connected",
+				this.name(), packet.getClass().getSimpleName());
 			return;
 		}
 		catch (final Exception e) {

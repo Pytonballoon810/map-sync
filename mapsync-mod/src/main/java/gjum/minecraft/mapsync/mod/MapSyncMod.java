@@ -236,9 +236,21 @@ public final class MapSyncMod {
 		));
 		final var catchupChunksBySyncServer = new IdentityHashMap<SyncClient, List<CatchupChunk>>();
 		for (final CatchupChunk chunk : chunks) {
+			final SyncClient source = chunk.syncClient;
+			// Chunk's originating sync client may have closed since the
+			// timestamps response arrived — happens whenever a player
+			// reconnects mid-catchup or autoConnect retries from a stale
+			// address. Skip; a fresh connection re-discovers these chunks
+			// through the normal region-timestamps round.
+			if (source == null || source.state() != SyncClient.ConnectionState.WELCOMED) {
+				continue;
+			}
 			catchupChunksBySyncServer
-				.computeIfAbsent(chunk.syncClient, (key) -> new ArrayList<>())
+				.computeIfAbsent(source, (key) -> new ArrayList<>())
 				.add(chunk);
+		}
+		if (catchupChunksBySyncServer.isEmpty()) {
+			return;
 		}
 		for (final var byServerEntry : catchupChunksBySyncServer.entrySet()) {
 			final SyncClient syncConnection = byServerEntry.getKey();
