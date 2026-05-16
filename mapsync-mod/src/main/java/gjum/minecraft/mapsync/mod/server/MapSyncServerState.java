@@ -7,6 +7,8 @@ import gjum.minecraft.mapsync.mod.server.config.Whitelist;
 import gjum.minecraft.mapsync.mod.server.db.MapSyncDatabase;
 import gjum.minecraft.mapsync.mod.server.net.MapSyncWsServer;
 import gjum.minecraft.mapsync.mod.server.net.ProtocolHandler;
+import gjum.minecraft.mapsync.mod.server.scan.WorldChunkCapture;
+import gjum.minecraft.mapsync.mod.server.scan.WorldRegionScanner;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
@@ -39,7 +41,9 @@ public final class MapSyncServerState implements AutoCloseable {
 	private final @NotNull UuidCache uuidCache;
 	private final @NotNull MapSyncDatabase database;
 	private final @NotNull ProtocolHandler protocolHandler;
+	private final @NotNull WorldChunkCapture chunkCapture;
 	private volatile @Nullable MapSyncWsServer wsServer;
+	private volatile @Nullable WorldRegionScanner regionScanner;
 
 	private MapSyncServerState(
 		final @NotNull Path dataDir,
@@ -54,6 +58,7 @@ public final class MapSyncServerState implements AutoCloseable {
 		this.uuidCache = uuidCache;
 		this.database = database;
 		this.protocolHandler = new ProtocolHandler(this);
+		this.chunkCapture = new WorldChunkCapture(this);
 	}
 
 	public static @NotNull MapSyncServerState open(
@@ -70,6 +75,12 @@ public final class MapSyncServerState implements AutoCloseable {
 
 	@Override
 	public void close() throws Exception {
+		final WorldRegionScanner scanner = this.regionScanner;
+		if (scanner != null) {
+			// Daemon thread; just signal — it'll exit when the JVM does.
+			this.regionScanner = null;
+		}
+		this.chunkCapture.close();
 		final MapSyncWsServer running = this.wsServer;
 		if (running != null) {
 			try {
@@ -105,6 +116,25 @@ public final class MapSyncServerState implements AutoCloseable {
 
 	public @NotNull ProtocolHandler protocolHandler() {
 		return this.protocolHandler;
+	}
+
+	public @NotNull WorldChunkCapture chunkCapture() {
+		return this.chunkCapture;
+	}
+
+	public @Nullable WorldRegionScanner regionScanner() {
+		return this.regionScanner;
+	}
+
+	/// Arms the CHUNK_LOAD capture hook and (on first run per dimension)
+	/// kicks off the background region-file scanner. Called from
+	/// SERVER_STARTED — by then the server has all dimensions constructed
+	/// and the chunk pipeline is alive enough to accept getChunk calls.
+	public void startWorldCapture(final @NotNull MinecraftServer server) {
+		this.chunkCapture.start();
+		final WorldRegionScanner scanner = new WorldRegionScanner(server, this);
+		this.regionScanner = scanner;
+		scanner.start();
 	}
 
 	public @NotNull Path dataDir() {

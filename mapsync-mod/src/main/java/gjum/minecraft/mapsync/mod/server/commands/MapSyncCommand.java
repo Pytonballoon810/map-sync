@@ -12,6 +12,8 @@ import gjum.minecraft.mapsync.mod.server.config.Whitelist;
 import gjum.minecraft.mapsync.mod.server.net.MapSyncWsServer;
 import gjum.minecraft.mapsync.mod.server.net.WsServerClient;
 import gjum.minecraft.mapsync.mod.server.net.auth.ServerAuthState;
+import gjum.minecraft.mapsync.mod.server.scan.WorldChunkCapture;
+import gjum.minecraft.mapsync.mod.server.scan.WorldRegionScanner;
 import gjum.minecraft.mapsync.mod.utils.MapSyncLogCapture;
 import java.nio.file.Path;
 import java.util.Comparator;
@@ -133,6 +135,30 @@ public final class MapSyncCommand {
 		else {
 			src.sendSuccess(() -> text("websocket: ", ChatFormatting.AQUA)
 				.append(text("not started", ChatFormatting.YELLOW)), false);
+		}
+
+		final WorldChunkCapture capture = state.chunkCapture();
+		src.sendSuccess(() -> text("chunk capture: ", ChatFormatting.AQUA)
+			.append(text(capture.capturedCount() + " stored", ChatFormatting.WHITE))
+			.append(text("  (queue=" + capture.queueSize()
+				+ ", dropped=" + capture.droppedCount()
+				+ ", failed=" + capture.failedCount() + ")", ChatFormatting.GRAY)), false);
+
+		final WorldRegionScanner scanner = state.regionScanner();
+		if (scanner != null) {
+			final WorldRegionScanner.Status scanStatus = scanner.status();
+			final MutableComponent scanLine = text("region scan: ", ChatFormatting.AQUA);
+			switch (scanStatus) {
+				case final WorldRegionScanner.Status.Idle $ ->
+					scanLine.append(text("not yet started", ChatFormatting.GRAY));
+				case final WorldRegionScanner.Status.Scanning s ->
+					scanLine.append(text(s.chunksRequested() + " requested, in " + s.dimension(), ChatFormatting.YELLOW));
+				case final WorldRegionScanner.Status.Done d ->
+					scanLine.append(text("done (" + d.chunksRequested() + " requested)", ChatFormatting.GREEN));
+				case final WorldRegionScanner.Status.Failed f ->
+					scanLine.append(text("failed: " + f.reason(), ChatFormatting.RED));
+			}
+			src.sendSuccess(() -> scanLine, false);
 		}
 		return 1;
 	}

@@ -98,6 +98,12 @@ public final class MapSyncServerMod {
 			catch (final Exception e) {
 				logger.error("Failed to start MapSync websocket server", e);
 			}
+			try {
+				state.startWorldCapture(server);
+			}
+			catch (final Exception e) {
+				logger.error("Failed to start MapSync world capture / scan", e);
+			}
 		});
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
 			final MapSyncServerState state = MapSyncServerState.current();
