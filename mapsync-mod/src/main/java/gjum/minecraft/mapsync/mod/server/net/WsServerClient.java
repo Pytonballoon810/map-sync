@@ -4,14 +4,14 @@ import gjum.minecraft.mapsync.mod.deps.websockets.WebSocket;
 import gjum.minecraft.mapsync.mod.deps.websockets.exceptions.WebsocketNotConnectedException;
 import gjum.minecraft.mapsync.mod.net.Packet;
 import gjum.minecraft.mapsync.mod.net.buffers.BufferWriter;
+import gjum.minecraft.mapsync.mod.server.MsServerLog;
 import gjum.minecraft.mapsync.mod.server.net.auth.ServerAuthState;
 import gjum.minecraft.mapsync.mod.utils.MagicValues;
 import java.io.ByteArrayOutputStream;
 import net.minecraft.resources.Identifier;
+import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /// Server-side mirror of the client mod's SyncClient: one instance per
 /// accepted websocket. Stores the per-connection auth state, the player's
@@ -25,7 +25,7 @@ import org.slf4j.LoggerFactory;
 /// transitions per-connection so we never need locks for ordering, only
 /// for visibility.
 public final class WsServerClient {
-	private static final Logger logger = LoggerFactory.getLogger(WsServerClient.class);
+	private static final Logger logger = MsServerLog.get(WsServerClient.class);
 
 	private final @NotNull WebSocket conn;
 	public final long id;

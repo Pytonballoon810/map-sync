@@ -7,16 +7,16 @@ import gjum.minecraft.mapsync.mod.net.Packet;
 import gjum.minecraft.mapsync.mod.net.buffers.BufferReader;
 import gjum.minecraft.mapsync.mod.net.packet.ChunkTilePacket;
 import gjum.minecraft.mapsync.mod.server.MapSyncServerState;
+import gjum.minecraft.mapsync.mod.server.MsServerLog;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
+import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /// Java port of `mapsync-server/src/server.ts` (WSServer). Accepts websocket
 /// connections, attaches a per-connection {@link WsServerClient} to each,
@@ -31,7 +31,7 @@ import org.slf4j.LoggerFactory;
 /// long-running work (notably Mojang auth, which blocks on HTTP) is offloaded
 /// by the ProtocolHandler so we don't starve the workers.
 public final class MapSyncWsServer extends WebSocketServer {
-	private static final Logger logger = LoggerFactory.getLogger(MapSyncWsServer.class);
+	private static final Logger logger = MsServerLog.get(MapSyncWsServer.class);
 
 	private final @NotNull MapSyncServerState state;
 	private final @NotNull ProtocolHandler handler;

@@ -7,6 +7,7 @@ import gjum.minecraft.mapsync.mod.sync.XaeroBackfillStatus;
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.Set;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Checkbox;
@@ -120,6 +121,17 @@ public final class SyncConnectionsGui extends Screen {
 				)
 				.pos(10, this.height - 30)
 				.width(60)
+				.build()
+		);
+
+		this.addRenderableWidget(
+			Button
+				.builder(
+					Component.literal("Open log"),
+					(button) -> Minecraft.getInstance().setScreen(new MapSyncLogScreen(this))
+				)
+				.pos(75, this.height - 30)
+				.width(80)
 				.build()
 		);
 

@@ -1,6 +1,7 @@
 package gjum.minecraft.mapsync.mod.server.commands;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.LongArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
@@ -11,6 +12,7 @@ import gjum.minecraft.mapsync.mod.server.config.Whitelist;
 import gjum.minecraft.mapsync.mod.server.net.MapSyncWsServer;
 import gjum.minecraft.mapsync.mod.server.net.WsServerClient;
 import gjum.minecraft.mapsync.mod.server.net.auth.ServerAuthState;
+import gjum.minecraft.mapsync.mod.utils.MapSyncLogCapture;
 import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
@@ -68,6 +70,10 @@ public final class MapSyncCommand {
 					.then(Commands.literal("kick")
 						.then(Commands.argument("id", LongArgumentType.longArg(1))
 							.executes(MapSyncCommand::handleClientsKick))))
+				.then(Commands.literal("logs")
+					.executes((ctx) -> handleLogs(ctx, 20))
+					.then(Commands.argument("count", IntegerArgumentType.integer(1, 200))
+						.executes((ctx) -> handleLogs(ctx, IntegerArgumentType.getInteger(ctx, "count")))))
 		);
 	}
 
@@ -172,6 +178,38 @@ public final class MapSyncCommand {
 				.append(text(addr, ChatFormatting.WHITE)), false);
 		}
 		return clients.size();
+	}
+
+	private static int handleLogs(
+		final @NotNull CommandContext<CommandSourceStack> ctx,
+		final int count
+	) {
+		final List<MapSyncLogCapture.Entry> entries = MapSyncLogCapture.tail(count);
+		final CommandSourceStack src = ctx.getSource();
+		if (entries.isEmpty()) {
+			src.sendSuccess(() -> text("No MapSync log entries captured yet", ChatFormatting.YELLOW), false);
+			return 0;
+		}
+		src.sendSuccess(() -> header("MapSync log")
+			.append(text(" (last " + entries.size() + " of " + MapSyncLogCapture.size() + ")", ChatFormatting.GRAY)), false);
+		for (final MapSyncLogCapture.Entry entry : entries) {
+			final ChatFormatting color = switch (entry.level()) {
+				case "ERROR", "FATAL" -> ChatFormatting.RED;
+				case "WARN" -> ChatFormatting.YELLOW;
+				case "DEBUG", "TRACE" -> ChatFormatting.DARK_GRAY;
+				default -> ChatFormatting.WHITE;
+			};
+			final String line = entry.formatted();
+			// Chat lines have a soft length cap — split overlong entries by
+			// natural newlines (stack traces). Each fragment renders as its
+			// own chat row so the operator can still read the whole thing.
+			for (final String fragment : line.split("\\r?\\n")) {
+				if (fragment.isEmpty()) continue;
+				src.sendSuccess(() -> text(fragment, color), false);
+			}
+		}
+		src.sendSuccess(() -> muted("(use /mapsync logs <1-200> to fetch a different size)"), false);
+		return entries.size();
 	}
 
 	private static int handleClientsKick(

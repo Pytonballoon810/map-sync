@@ -17,6 +17,7 @@ import gjum.minecraft.mapsync.mod.net.packet.ServerboundDimensionChangePacket;
 import gjum.minecraft.mapsync.mod.net.packet.ServerboundHandshakePacket;
 import gjum.minecraft.mapsync.mod.net.packet.ServerboundIdentityResponsePacket;
 import gjum.minecraft.mapsync.mod.server.MapSyncServerState;
+import gjum.minecraft.mapsync.mod.server.MsServerLog;
 import gjum.minecraft.mapsync.mod.server.db.ChunkTimestamp;
 import gjum.minecraft.mapsync.mod.server.db.StoredChunk;
 import gjum.minecraft.mapsync.mod.server.net.auth.MojangSessionAuth;
@@ -37,9 +38,8 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
+import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /// Java port of `mapsync-server/src/main.ts` (ProtocolHandler). Owns the
 /// packet-routing switch, the auth state machine transitions, the chunk
@@ -51,7 +51,7 @@ import org.slf4j.LoggerFactory;
 /// the identity response — otherwise a slow Mojang would stall every other
 /// connection sharing that worker.
 public final class ProtocolHandler {
-	private static final Logger logger = LoggerFactory.getLogger(ProtocolHandler.class);
+	private static final Logger logger = MsServerLog.get(ProtocolHandler.class);
 	private static final int SERVER_SALT_LENGTH = 32;
 
 	private final @NotNull MapSyncServerState state;
