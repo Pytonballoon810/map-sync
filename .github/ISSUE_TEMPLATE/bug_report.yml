@@ -1,0 +1,114 @@
+name: "Bug report"
+description: "Something isn't working as expected"
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: "markdown"
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug report. The more specific
+        you can be — exact jar filename, repro steps, what you saw vs. what
+        you expected — the faster I can act on it.
+
+        For crashes or stack traces, attach the full log file (drag-and-drop
+        works in the box) rather than pasting the top few lines.
+
+  - type: "checkboxes"
+    id: "preflight"
+    attributes:
+      label: "Pre-flight"
+      options:
+        - label: "I've searched existing issues and this hasn't been reported."
+          required: true
+        - label: "I'm running the latest release from the [Releases page](https://github.com/Pytonballoon810/map-sync/releases) (or can reproduce on it)."
+          required: true
+
+  - type: "textarea"
+    id: "description"
+    attributes:
+      label: "What happened"
+      description: "A clear, factual description of the bug."
+      placeholder: "MapSync skipped catchup chunks for an area my friend had explored, even though the GUI showed `Tracked chunks: 12,000 across 24 regions`."
+    validations:
+      required: true
+
+  - type: "textarea"
+    id: "reproduction"
+    attributes:
+      label: "Steps to reproduce"
+      description: "Numbered steps to reproduce starting from a fresh launch. If the bug is intermittent, say so and describe how often."
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: "textarea"
+    id: "expected"
+    attributes:
+      label: "What you expected"
+      placeholder: "Catchup chunks should have been rendered into Xaero since I'd never visited those chunks before."
+    validations:
+      required: true
+
+  - type: "textarea"
+    id: "actual"
+    attributes:
+      label: "What actually happened"
+      placeholder: "Catchup chunks were skipped with `skipping render to preserve existing map data` debug-log entries."
+    validations:
+      required: true
+
+  - type: "input"
+    id: "mod_version"
+    attributes:
+      label: "MapSync version"
+      description: "The exact jar filename, e.g. `MapSync-26.1.2.jar`."
+      placeholder: "MapSync-26.1.2.jar"
+    validations:
+      required: true
+
+  - type: "input"
+    id: "mc_version"
+    attributes:
+      label: "Minecraft version"
+      placeholder: "26.1.2"
+    validations:
+      required: true
+
+  - type: "dropdown"
+    id: "side"
+    attributes:
+      label: "Where does the bug occur?"
+      options:
+        - "Client only"
+        - "Dedicated server only"
+        - "Both client and server"
+        - "Not sure"
+    validations:
+      required: true
+
+  - type: "checkboxes"
+    id: "map_mods"
+    attributes:
+      label: "Map mods installed (client side)"
+      options:
+        - label: "Xaero's World Map"
+        - label: "Xaero's Minimap"
+        - label: "JourneyMap"
+        - label: "VoxelMap"
+        - label: "None"
+
+  - type: "textarea"
+    id: "logs"
+    attributes:
+      label: "Logs and crash reports"
+      description: "Attach the relevant `latest.log` / crash report. For server bugs, the server console output covering the issue. For client bugs, `.minecraft/logs/latest.log`."
+      placeholder: "Drag and drop log files here, or paste the relevant section."
+
+  - type: "textarea"
+    id: "context"
+    attributes:
+      label: "Additional context"
+      description: "Anything else worth knowing — config tweaks, proxy setups, modded MC server flavor (Paper, Fabric server jar, etc.), other mods loaded, recent changes."

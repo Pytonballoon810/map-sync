@@ -95,6 +95,17 @@ See [docs/getting-started.md](docs/getting-started.md) for the full operator wor
 
 ---
 
+## Reporting issues
+
+Issues live at [github.com/Pytonballoon810/map-sync/issues](https://github.com/Pytonballoon810/map-sync/issues). Two structured forms keep reports actionable:
+
+- [**Report a bug**](https://github.com/Pytonballoon810/map-sync/issues/new?template=bug_report.yml) — for crashes, broken behavior, things that used to work, etc.
+- [**Suggest a feature**](https://github.com/Pytonballoon810/map-sync/issues/new?template=feature_request.yml) — for new commands, GUI changes, protocol additions, quality-of-life improvements.
+
+If your question doesn't fit either, [open a blank issue](https://github.com/Pytonballoon810/map-sync/issues/new) and tag it as you see fit.
+
+---
+
 ## Compatibility
 
 | Component              | Version                                                            |

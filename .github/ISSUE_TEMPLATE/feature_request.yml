@@ -1,0 +1,75 @@
+name: "Feature request"
+description: "Suggest an idea or improvement"
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: "markdown"
+    attributes:
+      value: |
+        Suggestions are welcome. The more specific the proposal — what
+        problem it solves, who benefits, what the trade-offs look like —
+        the higher the chance it lands.
+
+        If you're not sure whether something is in-scope, file the issue
+        anyway. Worst case it gets closed with a one-line "out of scope"
+        and the rationale lands in a place future people can find.
+
+  - type: "checkboxes"
+    id: "preflight"
+    attributes:
+      label: "Pre-flight"
+      options:
+        - label: "I've searched existing issues (open and closed) and this hasn't been requested."
+          required: true
+
+  - type: "textarea"
+    id: "summary"
+    attributes:
+      label: "Summary"
+      description: "One or two sentences. What's the feature?"
+      placeholder: "Add a `/mapsync purge <player-uuid>` command that wipes one player's contributions from the chunk database."
+    validations:
+      required: true
+
+  - type: "textarea"
+    id: "problem"
+    attributes:
+      label: "Problem it solves"
+      description: "What's the situation today that this feature would improve? Real example beats abstract reasoning."
+      placeholder: "When someone leaves the server permanently I can ban them from MapSync via `/mapsync whitelist remove`, but their chunk contributions stay in db.sqlite and keep getting served on catchup. No clean way to revoke them retroactively."
+    validations:
+      required: true
+
+  - type: "textarea"
+    id: "proposal"
+    attributes:
+      label: "Proposed solution"
+      description: "How would it work, end-to-end? GUI, command, config option, automatic behavior?"
+      placeholder: "Operator command that deletes rows in `player_chunk` (and orphaned `chunk_data` rows) for the given UUID. Should also kick the player if connected and remove them from the whitelist in one shot."
+    validations:
+      required: true
+
+  - type: "textarea"
+    id: "alternatives"
+    attributes:
+      label: "Alternatives considered"
+      description: "Other ways to solve the same problem. Why is the proposal above better?"
+
+  - type: "dropdown"
+    id: "scope"
+    attributes:
+      label: "Which side does this touch?"
+      options:
+        - "Client only (rendering, GUI, etc.)"
+        - "Server only (websocket, DB, commands, etc.)"
+        - "Both / shared protocol (new packet type, etc.)"
+        - "Tooling / CI / docs"
+        - "Not sure"
+    validations:
+      required: true
+
+  - type: "textarea"
+    id: "context"
+    attributes:
+      label: "Additional context"
+      description: "Anything else — related upstream issues, prior art in other mods, mockups, links to relevant code."
