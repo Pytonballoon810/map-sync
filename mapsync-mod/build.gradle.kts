@@ -13,7 +13,11 @@ private val project_home_url: String by project
 private val project_source_url: String by project
 private val project_issues_url: String by project
 
-version = "${mapsync_version}-mc${libs.versions.minecraft.get()}"
+// Mod version tracks the targeted Minecraft version directly, so the
+// jar filename is just `MapSync-<mc-version>.jar` with no redundant
+// suffix. Keep `mapsync_version` in `gradle.properties` aligned with
+// `libs.versions.minecraft` whenever you bump MC.
+version = mapsync_version
 group = project_group
 
 private val modLocalDep: Configuration by configurations.creating
