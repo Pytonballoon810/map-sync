@@ -135,6 +135,15 @@ public final class MapSyncWsServer extends WebSocketServer {
 			conn.close(1011); // attachment lost
 			return;
 		}
+		// Drop late frames from a connection that's already closing. The
+		// Java-WebSocket worker thread can deliver decoded frames after
+		// onClose has fired (read buffer drains independently of the
+		// close handshake), which would otherwise trigger spurious
+		// "chunk-tile before welcome" kicks against an already-dead
+		// connection.
+		if (!conn.isOpen()) {
+			return;
+		}
 		// Capture the full frame before any read advances `message.position`.
 		// ChunkTilePackets are relayed verbatim to other clients without
 		// re-encoding, so we hand these original bytes to the protocol

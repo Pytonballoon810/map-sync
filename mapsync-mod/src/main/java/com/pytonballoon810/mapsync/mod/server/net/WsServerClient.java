@@ -110,10 +110,14 @@ public final class WsServerClient {
 
 	/// Closes the connection with the standard MapSync kick code. The
 	/// `internalReason` is logged but never forwarded over the wire — the
-	/// protocol carries no human-readable kick reason.
+	/// protocol carries no human-readable kick reason. Idempotent on an
+	/// already-closed connection: no log, no extra close.
 	public void kick(
 		final @NotNull String internalReason
 	) {
+		if (!this.conn.isOpen()) {
+			return;
+		}
 		logger.info("[{}] kicking: {}", this.name(), internalReason);
 		this.conn.close(MagicValues.CLOSE_CODE_KICKED);
 	}
