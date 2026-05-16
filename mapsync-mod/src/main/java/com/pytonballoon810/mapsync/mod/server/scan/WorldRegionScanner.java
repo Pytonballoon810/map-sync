@@ -118,11 +118,26 @@ public final class WorldRegionScanner {
 		final int startingCount
 	) throws InterruptedException, IOException {
 		final Path regionDir = regionDirFor(this.server, level);
-		if (regionDir == null || !Files.isDirectory(regionDir)) {
+		if (regionDir == null) {
+			logger.warn("No region directory mapping known for dimension {}", level.dimension().identifier());
+			return 0;
+		}
+		logger.info("Looking for region files for {} at {}",
+			level.dimension().identifier(), regionDir.toAbsolutePath().normalize());
+		if (!Files.isDirectory(regionDir)) {
+			logger.warn(
+				"Region dir {} for {} does not exist or is not a directory — scan will skip this dimension. "
+					+ "Server-side capture will still record chunks as players load them; "
+					+ "but historical pre-MapSync chunks won't be backfilled into the DB.",
+				regionDir.toAbsolutePath().normalize(),
+				level.dimension().identifier()
+			);
 			return 0;
 		}
 		final Path marker = this.state.dataDir().resolve(".world-scanned-" + safeName(level));
 		if (Files.exists(marker)) {
+			logger.info("Skipping {} scan — marker file already exists at {}",
+				level.dimension().identifier(), marker);
 			return 0;
 		}
 		this.status.set(new Status.Scanning(startingCount, level.dimension().identifier().toString()));
@@ -217,7 +232,11 @@ public final class WorldRegionScanner {
 	/// `<world>/[dim-folder]/region/`. Vanilla dimensions use hardcoded
 	/// folder names (overworld is the world root, the_nether is DIM-1,
 	/// the_end is DIM1); everything else lands at
-	/// `<world>/dimensions/<namespace>/<path>/`.
+	/// `<world>/dimensions/<namespace>/<path>/`. Paths are normalized
+	/// before return so the redundant `./` segments
+	/// `MinecraftServer.getWorldPath(LevelResource.ROOT)` introduces don't
+	/// trip up subsequent `Files.isDirectory` checks on every JDK / FS
+	/// combination.
 	private static @Nullable Path regionDirFor(
 		final @NotNull MinecraftServer server,
 		final @NotNull ServerLevel level
@@ -226,15 +245,19 @@ public final class WorldRegionScanner {
 		final Identifier dim = level.dimension().identifier();
 		final String ns = dim.getNamespace();
 		final String path = dim.getPath();
+		final Path raw;
 		if ("minecraft".equals(ns)) {
-			return switch (path) {
+			raw = switch (path) {
 				case "overworld" -> root.resolve("region");
 				case "the_nether" -> root.resolve("DIM-1").resolve("region");
 				case "the_end" -> root.resolve("DIM1").resolve("region");
 				default -> root.resolve("dimensions").resolve(ns).resolve(path).resolve("region");
 			};
 		}
-		return root.resolve("dimensions").resolve(ns).resolve(path).resolve("region");
+		else {
+			raw = root.resolve("dimensions").resolve(ns).resolve(path).resolve("region");
+		}
+		return raw.toAbsolutePath().normalize();
 	}
 
 	private static @NotNull String safeName(final @NotNull ServerLevel level) {
