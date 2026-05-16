@@ -82,7 +82,7 @@ public final class MapSyncDatabase implements AutoCloseable {
 	/// Region-level catch-up summary: for every region in this dimension,
 	/// the newest write timestamp across all players. Used to seed a
 	/// freshly-connected client with the broadest possible view.
-	public @NotNull List<RegionTimestamp> getRegionTimestamps(
+	public synchronized @NotNull List<RegionTimestamp> getRegionTimestamps(
 		final @NotNull String dimension
 	) throws SQLException {
 		final var out = new ArrayList<RegionTimestamp>();
@@ -116,7 +116,7 @@ public final class MapSyncDatabase implements AutoCloseable {
 	/// Chunk-level catch-up summary for one region in one dimension. One row
 	/// per (chunk_x, chunk_z), carrying the newest write timestamp across
 	/// players.
-	public @NotNull List<ChunkTimestamp> getChunkTimestamps(
+	public synchronized @NotNull List<ChunkTimestamp> getChunkTimestamps(
 		final @NotNull String dimension,
 		final int regionX,
 		final int regionZ
@@ -154,7 +154,7 @@ public final class MapSyncDatabase implements AutoCloseable {
 
 	/// Most-recent payload for a single chunk: joins the newest `player_chunk`
 	/// row for this (dim, x, z) against the deduplicated `chunk_data` row.
-	public @NotNull Optional<StoredChunk> getChunkData(
+	public synchronized @NotNull Optional<StoredChunk> getChunkData(
 		final @NotNull String dimension,
 		final int chunkX,
 		final int chunkZ
@@ -190,7 +190,7 @@ public final class MapSyncDatabase implements AutoCloseable {
 	/// Records one player's report of a chunk's contents. The actual payload
 	/// is deduplicated by hash in `chunk_data`; the `player_chunk` row
 	/// associates this (player, chunk) with the payload and a timestamp.
-	public void storeChunkData(
+	public synchronized void storeChunkData(
 		final @NotNull String dimension,
 		final int chunkX,
 		final int chunkZ,
@@ -200,6 +200,11 @@ public final class MapSyncDatabase implements AutoCloseable {
 		final byte @NotNull [] hash,
 		final byte @NotNull [] data
 	) throws SQLException {
+		// Method is synchronized so the auto-commit toggle is exclusive —
+		// without that, concurrent callers (ws-server netty workers
+		// handling ChunkTilePackets plus the world-scan capture worker)
+		// would race on the shared Connection's transaction state and
+		// commit/rollback against each other's in-flight statements.
 		final boolean previousAutoCommit = this.conn.getAutoCommit();
 		this.conn.setAutoCommit(false);
 		try {
@@ -225,7 +230,17 @@ public final class MapSyncDatabase implements AutoCloseable {
 			this.conn.commit();
 		}
 		catch (final SQLException e) {
-			this.conn.rollback();
+			// Rollback can itself fail ("no transaction is active") if the
+			// driver already auto-rolled back, or if the failure happened
+			// before any statement opened a transaction. Swallow that as a
+			// suppressed exception so the caller still sees the original
+			// cause.
+			try {
+				this.conn.rollback();
+			}
+			catch (final SQLException rollbackErr) {
+				e.addSuppressed(rollbackErr);
+			}
 			throw e;
 		}
 		finally {
@@ -234,7 +249,7 @@ public final class MapSyncDatabase implements AutoCloseable {
 	}
 
 	@Override
-	public void close() throws SQLException {
+	public synchronized void close() throws SQLException {
 		this.conn.close();
 	}
 }
