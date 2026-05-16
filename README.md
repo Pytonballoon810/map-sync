@@ -1,62 +1,120 @@
-## Map-Sync
+<div align="center">
 
-**Real-time terrain synchronization**: see exactly what your friends see, as they explore it.
+# MapSync
 
-Supports `Journeymap`, `Voxelmap`, and `Xaero's World Map` (+ minimap).
+**Real-time terrain synchronization for Minecraft.**
+See exactly what your friends see, as they explore it.
 
-## [Download](https://modrinth.com/mod/mapsync/versions)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+[![Minecraft](https://img.shields.io/badge/Minecraft-26.1.2-brightgreen.svg)](https://www.minecraft.net/)
+[![Loader](https://img.shields.io/badge/Loader-Fabric-blueviolet.svg)](https://fabricmc.net/)
+[![Java](https://img.shields.io/badge/Java-25-orange.svg)](https://adoptium.net/)
 
-[Join the Discord for announcements, discussion, and support.](https://discord.gg/khMPvWjnKt)
+</div>
 
-## Usage
+---
 
-Drop the same MapSync jar into the `mods/` folder of:
+## What it does
 
-- Your **Fabric client**, alongside your map mod of choice.
-- The **Fabric server** you and your friends play on.
+Every time anyone with the mod loads a chunk in-game, MapSync hashes it and ships it to the sync server. The server stores it once (deduplicated by hash) and relays it to every other player currently connected. On the client, MapSync pipes received chunks into your map mod's tile cache — so areas your friends explore light up on **your** map in real time, even when you've never been there.
 
-That's it. On join, the server tells your client where its MapSync endpoint is via a Fabric custom payload; the client auto-connects without any GUI interaction. The keybind (comma `,` by default) still opens the MapSync GUI if you want to inspect the connection, toggle the safeguard, or override the address manually.
+```mermaid
+flowchart LR
+    A[Player A<br/>Fabric client] -- ws:// --> S{Minecraft server<br/>+ MapSync<br/>:12312}
+    B[Player B<br/>Fabric client] -- ws:// --> S
+    C[Player C<br/>Fabric client] -- ws:// --> S
+    S -.SQLite.- DB[(db.sqlite<br/>chunk store)]
+    A <-. Xaero / JourneyMap / VoxelMap .-> A
+    B <-. Xaero / JourneyMap / VoxelMap .-> B
+    C <-. Xaero / JourneyMap / VoxelMap .-> C
+```
 
-## How it works
+Compatible map mods:
 
-Every time anyone with the mod loads a chunk (even without a map mod installed), MapSync hashes the chunk and sends it to the server. The server stores it once, deduplicated by hash, and relays it to everyone else currently connected. When a compatible map mod is installed on your client, MapSync writes the received chunk into its tile cache so the area "lights up" on your map as your friends explore.
+|                       | Read  | Write | Notes                                                       |
+| --------------------- | :---: | :---: | ----------------------------------------------------------- |
+| **Xaero's World Map** |   yes |   yes | Region-granular `hasExistingChunkData` probe; first-class.  |
+| **JourneyMap**        |   yes |   yes | Existence probe is a fail-safe placeholder until ported.    |
+| **VoxelMap**          |   yes |   yes | Existence probe is a fail-safe placeholder until ported.    |
+| *(no map mod)*        |   yes |    —  | Still ships your chunk data, just doesn't render incoming.  |
 
-A per-chunk timestamp keeps order: older data never overwrites newer data, regardless of who saw it first.
+A per-chunk timestamp keeps order — older data never overwrites newer data, regardless of who saw it first.
 
-### Preserving existing map data
+---
 
-If you already explored the world before installing MapSync, your local map data is preserved by default — the safeguard skips overwriting chunks the sync server hasn't shown you a newer version of. On first connection, MapSync seeds its per-chunk timestamps from Xaero's region-file mtimes, so updates from your friends still flow through as soon as they're genuinely newer than what you have locally.
+## What's new in this fork
 
-Uncheck "Preserve existing map data" in the MapSync GUI to force a backfill of all chunks the server knows about (one-time, per server).
+| Change                                | Why                                                                                            |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| **Single bundled jar**                | Same jar runs on client and server. No more standalone Node.js process or Docker container.    |
+| **Auto-connect on join**              | Server pushes its ws address to clients via a Fabric custom payload. No GUI fiddling required. |
+| **Preserve existing map data**        | First-contact safeguard: never overwrites pre-existing Xaero / JM / VoxelMap tiles silently.   |
+| **Xaero mtime backfill**              | Seeds MapSync's timestamp index from Xaero's region cache on first install — friends' updates still flow through for areas you explored *before* installing MapSync. |
+| **In-game `/mapsync` admin commands** | Whitelist + client management without leaving the game.                                        |
+| **GUI progress lines**                | Tracked-chunk count and backfill phase visible in the MapSync settings screen.                 |
 
-## Running a server
+---
 
-The bundled jar is the server. Install Fabric on your Minecraft server and drop the MapSync jar into its `mods/` folder. On startup, MapSync creates a `<world>/mapsync/` directory with `config.json`, `whitelist.json`, `uuid_cache.json`, and `db.sqlite`. The MC server's `whitelist.json` and ops list are auto-imported into MapSync's whitelist — there's no second list to maintain.
+## Quick start
 
-In-game commands available to operators (`/op` or `level 3`):
+### Server side
 
-- `/mapsync status` — listening address, client count, whitelist size.
-- `/mapsync whitelist list` — entries with cached IGNs.
-- `/mapsync whitelist add|remove <player>` — accepts a UUID or a cached IGN.
-- `/mapsync whitelist reload` — re-reads `whitelist.json` and re-imports MC's allowlist.
-- `/mapsync clients list` — connected MapSync clients with auth state, dimension, and game address.
-- `/mapsync clients kick <id>` — close one MapSync connection.
+1. Run a Fabric Minecraft server matching the jar's MC version (see jar filename — e.g. `MapSync-26.1.2.jar` targets MC 26.1.2).
+2. Drop `MapSync-<version>.jar` and Fabric API into the server's `mods/` folder.
+3. Start the server. MapSync creates `<world>/mapsync/` on first boot.
+4. Forward `12312/tcp` to the server if players connect from outside your LAN.
 
-Default port is `12312/tcp`. To reach the server from a different host than the MC server, set `advertisedHost` in `config.json` and bounce the server.
+### Client side
 
-## Copyright
+1. Drop the same `MapSync-<version>.jar` into your **Fabric client's** `mods/` folder, alongside Fabric API and your map mod (Xaero / JourneyMap / VoxelMap).
+2. Join the Minecraft server normally — MapSync handshake runs automatically.
+3. Press `,` (comma) at any time to open the MapSync GUI.
 
-Copyright (C) 2022 Map-Sync contributors
+That's it. Operators on the MC server's whitelist or ops list are auto-imported into MapSync's whitelist — there's no second list to maintain.
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+> [!TIP]
+> Run `/mapsync status` on the server to confirm the websocket is listening and clients are connecting.
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-GNU General Public License for more details.
+---
 
-You should have received a copy of the GNU General Public License
-along with this program. If not, see <http://www.gnu.org/licenses/>.
+## Operator commands
+
+All commands require operator level 3 (`/op <player>` if needed):
+
+| Command                                   | Purpose                                                                |
+| ----------------------------------------- | ---------------------------------------------------------------------- |
+| `/mapsync status`                         | Listening address, client count, whitelist size, data directory.       |
+| `/mapsync whitelist list`                 | All whitelisted entries with cached IGNs.                              |
+| `/mapsync whitelist add <uuid-or-ign>`    | Add to whitelist. IGNs only resolve for players who joined MC before.  |
+| `/mapsync whitelist remove <uuid-or-ign>` | Remove from whitelist.                                                 |
+| `/mapsync whitelist reload`               | Re-read `whitelist.json` and re-import MC's allowlist.                 |
+| `/mapsync clients list`                   | Connected MapSync clients with auth state, dimension, game address.    |
+| `/mapsync clients kick <id>`              | Close one MapSync connection.                                          |
+
+See [docs/getting-started.md](docs/getting-started.md) for the full operator workflow, configuration reference, and migration notes from the standalone `mapsync-server`.
+
+---
+
+## Compatibility
+
+| Component              | Version                                                            |
+| ---------------------- | ------------------------------------------------------------------ |
+| Minecraft              | `26.1.2`                                                           |
+| Loader                 | Fabric                                                             |
+| Required mods          | Fabric API                                                         |
+| Optional client mods   | Xaero's World Map / JourneyMap / VoxelMap (any combination)        |
+| Java                   | 25 (`adoptium.net/temurin`)                                        |
+
+The mod version tracks the targeted Minecraft version directly — `MapSync-26.1.2.jar` works against MC `26.1.2`.
+
+---
+
+## Acknowledgements
+
+Forked from [CivPlatform/map-sync](https://github.com/CivPlatform/map-sync) by Gjum, Protonull, okx, Huskydog9988, specificlanguage, SirAlador, klaribot, Sheepy_9, and other contributors. The wire protocol, packet codecs, and chunk-extraction logic on the client side are upstream work. The bundling effort (in-mod websocket server, auto-discovery, safeguards, and Xaero backfill) is this fork's addition.
+
+---
+
+## License
+
+GPL v3. See [LICENSE](LICENSE) for the full text. In short: you can use, modify, and redistribute this code under the same license, including for commercial purposes, but derived works must remain GPL v3.
