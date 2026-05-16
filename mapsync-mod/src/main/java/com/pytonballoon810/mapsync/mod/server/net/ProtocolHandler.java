@@ -38,7 +38,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
-import org.apache.logging.log4j.Logger;
+
 import org.jetbrains.annotations.NotNull;
 
 /// Java port of `mapsync-server/src/main.ts` (ProtocolHandler). Owns the
@@ -51,7 +51,7 @@ import org.jetbrains.annotations.NotNull;
 /// the identity response — otherwise a slow Mojang would stall every other
 /// connection sharing that worker.
 public final class ProtocolHandler {
-	private static final Logger logger = MsServerLog.get(ProtocolHandler.class);
+	private static final MsServerLog logger = MsServerLog.get(ProtocolHandler.class);
 	private static final int SERVER_SALT_LENGTH = 32;
 
 	private final @NotNull MapSyncServerState state;

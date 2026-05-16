@@ -29,7 +29,7 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import com.pytonballoon810.mapsync.mod.utils.MapSyncLogCapture;
 import net.minecraft.server.level.ServerPlayer;
-import org.apache.logging.log4j.Logger;
+
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 
@@ -43,7 +43,7 @@ import org.jetbrains.annotations.NotNull;
 /// Phase 2 will plug the websocket server, persistence, and Mojang auth
 /// directly into the Minecraft server lifecycle from here.
 public final class MapSyncServerMod {
-	public static final Logger logger = MsServerLog.get(MapSyncServerMod.class);
+	public static final MsServerLog logger = MsServerLog.get(MapSyncServerMod.class);
 
 	@ApiStatus.Internal
 	public static void bootstrap() {

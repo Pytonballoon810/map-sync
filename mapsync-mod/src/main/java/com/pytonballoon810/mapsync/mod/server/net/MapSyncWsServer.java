@@ -14,7 +14,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
-import org.apache.logging.log4j.Logger;
+
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -31,7 +31,7 @@ import org.jetbrains.annotations.Nullable;
 /// long-running work (notably Mojang auth, which blocks on HTTP) is offloaded
 /// by the ProtocolHandler so we don't starve the workers.
 public final class MapSyncWsServer extends WebSocketServer {
-	private static final Logger logger = MsServerLog.get(MapSyncWsServer.class);
+	private static final MsServerLog logger = MsServerLog.get(MapSyncWsServer.class);
 
 	private final @NotNull MapSyncServerState state;
 	private final @NotNull ProtocolHandler handler;

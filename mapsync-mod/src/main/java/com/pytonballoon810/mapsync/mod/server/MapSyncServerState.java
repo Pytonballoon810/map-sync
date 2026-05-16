@@ -18,7 +18,7 @@ import net.minecraft.server.players.PlayerList;
 import net.minecraft.server.players.ServerOpListEntry;
 import net.minecraft.server.players.UserWhiteListEntry;
 import net.minecraft.world.level.storage.LevelResource;
-import org.apache.logging.log4j.Logger;
+
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -32,7 +32,7 @@ import org.jetbrains.annotations.Nullable;
 /// Data lives in `<world>/mapsync/` so a server with multiple worlds — or
 /// a server that swaps worlds — gets a fresh sync database per world.
 public final class MapSyncServerState implements AutoCloseable {
-	private static final Logger logger = MsServerLog.get(MapSyncServerState.class);
+	private static final MsServerLog logger = MsServerLog.get(MapSyncServerState.class);
 	private static volatile @Nullable MapSyncServerState instance;
 
 	private final @NotNull Path dataDir;

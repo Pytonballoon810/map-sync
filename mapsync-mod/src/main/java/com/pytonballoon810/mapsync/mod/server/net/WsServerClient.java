@@ -9,7 +9,7 @@ import com.pytonballoon810.mapsync.mod.server.net.auth.ServerAuthState;
 import com.pytonballoon810.mapsync.mod.utils.MagicValues;
 import java.io.ByteArrayOutputStream;
 import net.minecraft.resources.Identifier;
-import org.apache.logging.log4j.Logger;
+
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -25,7 +25,7 @@ import org.jetbrains.annotations.Nullable;
 /// transitions per-connection so we never need locks for ordering, only
 /// for visibility.
 public final class WsServerClient {
-	private static final Logger logger = MsServerLog.get(WsServerClient.class);
+	private static final MsServerLog logger = MsServerLog.get(WsServerClient.class);
 
 	private final @NotNull WebSocket conn;
 	public final long id;

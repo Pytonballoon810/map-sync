@@ -11,7 +11,7 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.LevelChunk;
-import org.apache.logging.log4j.Logger;
+
 import org.jetbrains.annotations.NotNull;
 
 /// Captures every chunk Minecraft loads on the server into MapSync's
@@ -30,7 +30,7 @@ import org.jetbrains.annotations.NotNull;
 /// for attribution, so the same chunk loaded repeatedly stays one row
 /// (REPLACE INTO bumps the timestamp).
 public final class WorldChunkCapture implements AutoCloseable {
-	private static final @NotNull Logger logger = MsServerLog.get(WorldChunkCapture.class);
+	private static final @NotNull MsServerLog logger = MsServerLog.get(WorldChunkCapture.class);
 	/// Synthetic player UUID under which the server itself "reports"
 	/// chunks. Deterministic so repeated captures of the same chunk
 	/// stay one row in `player_chunk`.

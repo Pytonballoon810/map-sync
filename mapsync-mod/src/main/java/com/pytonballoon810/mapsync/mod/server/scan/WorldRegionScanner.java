@@ -21,7 +21,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.storage.LevelResource;
-import org.apache.logging.log4j.Logger;
+
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -46,7 +46,7 @@ import org.jetbrains.annotations.Nullable;
 /// safely re-run from scratch on the next session — the captures are
 /// idempotent (REPLACE INTO keyed by the synthetic server UUID).
 public final class WorldRegionScanner {
-	private static final @NotNull Logger logger = MsServerLog.get(WorldRegionScanner.class);
+	private static final @NotNull MsServerLog logger = MsServerLog.get(WorldRegionScanner.class);
 	private static final @NotNull Pattern MCA_NAME =
 		Pattern.compile("r\\.(-?\\d+)\\.(-?\\d+)\\.mca");
 	/// Throttle between chunk-load requests. Each call already blocks on
