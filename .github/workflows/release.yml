@@ -25,8 +25,15 @@ jobs:
           java-version: "25"
           distribution: "temurin"
 
+      # Strip the leading `v` from the tag to use it as the gradle
+      # version override, so the produced jar is named after the tag
+      # (e.g. `MapSync-26.1.2-alpha0.jar`). gradle.properties still
+      # carries a base version for local builds outside the tag flow.
       - name: "Build mod"
-        run: "./gradlew build"
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "Building with mapsync_version=${VERSION}"
+          ./gradlew build -Pmapsync_version="${VERSION}"
         working-directory: "./mapsync-mod"
 
       # Derive release flavor from the tag suffix so a single tag drives both

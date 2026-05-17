@@ -81,12 +81,15 @@ if [[ -n "$REMOTE_MAIN" && "$LOCAL_HEAD" != "$REMOTE_MAIN" ]]; then
 	echo "         Make sure you've pushed your commits first."
 fi
 
-# 5. Local build.
-echo ">>> Running local build before tagging..."
-echo ">>> cd mapsync-mod && ./gradlew --no-daemon build"
+# 5. Local build — override mapsync_version with the tag (minus the
+#    leading `v`) so the produced jar in `dist/` is named the same
+#    way CI will name it.
+VERSION="${TAG#v}"
+echo ">>> Running local build (mapsync_version=${VERSION})..."
+echo ">>> cd mapsync-mod && ./gradlew --no-daemon build -Pmapsync_version=${VERSION}"
 (
 	cd mapsync-mod
-	./gradlew --no-daemon build
+	./gradlew --no-daemon build -Pmapsync_version="${VERSION}"
 )
 echo ">>> Build OK."
 
