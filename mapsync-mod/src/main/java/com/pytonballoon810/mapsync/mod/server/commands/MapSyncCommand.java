@@ -78,7 +78,116 @@ public final class MapSyncCommand {
 						.executes((ctx) -> handleLogs(ctx, IntegerArgumentType.getInteger(ctx, "count")))))
 				.then(Commands.literal("rescan")
 					.executes(MapSyncCommand::handleRescan))
+				.then(Commands.literal("diagnose")
+					.executes(MapSyncCommand::handleDiagnose))
 		);
+	}
+
+	private static int handleDiagnose(
+		final @NotNull CommandContext<CommandSourceStack> ctx
+	) throws CommandSyntaxException {
+		final MapSyncServerState state = requireState();
+		final CommandSourceStack src = ctx.getSource();
+		final StringBuilder report = new StringBuilder(8192);
+		final java.time.format.DateTimeFormatter ts =
+			java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+				.withZone(java.time.ZoneId.systemDefault());
+		report.append("=== MapSync diagnostic report ").append(ts.format(java.time.Instant.now())).append(" ===\n\n");
+
+		report.append("[config]\n");
+		report.append("  data dir: ").append(state.dataDir()).append('\n');
+		report.append("  host: ").append(state.config().host).append('\n');
+		report.append("  port: ").append(state.config().port).append('\n');
+		report.append("  auth: ").append(state.config().auth).append('\n');
+		report.append("  whitelist: ").append(state.config().whitelist).append('\n');
+		report.append("  advertisedHost: '").append(state.config().advertisedHost).append("'\n");
+		report.append("  mapsync version: ").append(com.pytonballoon810.mapsync.mod.utils.MagicValues.VERSION).append('\n');
+		report.append("  whitelist entries: ").append(state.whitelist().size()).append('\n');
+		report.append("  uuid cache entries: ").append(state.uuidCache().size()).append("\n\n");
+
+		final MapSyncWsServer ws = state.wsServer();
+		report.append("[websocket]\n");
+		if (ws == null) {
+			report.append("  not started\n\n");
+		}
+		else {
+			report.append("  listening on: ").append(ws.getAddress()).append('\n');
+			report.append("  active clients: ").append(ws.activeClients().size()).append("\n\n");
+		}
+
+		final WorldChunkCapture capture = state.chunkCapture();
+		report.append("[chunk capture]\n");
+		report.append("  captured: ").append(capture.capturedCount()).append('\n');
+		report.append("  queue: ").append(capture.queueSize()).append(" / ").append(capture.queueCapacity()).append('\n');
+		report.append("  dropped: ").append(capture.droppedCount()).append('\n');
+		report.append("  failed: ").append(capture.failedCount()).append("\n\n");
+
+		final WorldRegionScanner scanner = state.regionScanner();
+		report.append("[region scan]\n");
+		if (scanner == null) {
+			report.append("  not initialised\n\n");
+		}
+		else {
+			report.append("  status: ").append(scanner.status()).append("\n\n");
+		}
+
+		report.append("[connected clients]\n");
+		if (ws == null || ws.activeClients().isEmpty()) {
+			report.append("  (none)\n\n");
+		}
+		else {
+			for (final WsServerClient c : ws.activeClients()) {
+				report.append("  #").append(c.id).append(' ').append(c.auth.logName()).append('\n');
+				report.append("    auth state: ").append(c.auth.getClass().getSimpleName()).append('\n');
+				if (c.auth instanceof final ServerAuthState.Welcomed w) {
+					report.append("    uuid: ").append(w.uuid()).append(" authed=").append(w.authed()).append('\n');
+				}
+				report.append("    dim: ").append(c.dimension != null ? c.dimension : "—").append('\n');
+				report.append("    via: ").append(c.gameAddress != null ? c.gameAddress : "—").append('\n');
+				report.append("    packets: in=").append(c.packetsReceived.get())
+					.append(" out=").append(c.packetsSent.get()).append('\n');
+				report.append("    chunk tiles: in=").append(c.chunkTilesReceived.get())
+					.append(" out=").append(c.chunkTilesSentToClient.get()).append('\n');
+				report.append("    catchup batches fulfilled: ").append(c.catchupBatchesFulfilled.get()).append('\n');
+			}
+			report.append('\n');
+		}
+
+		report.append("[recent log capture (last 50 entries)]\n");
+		final List<MapSyncLogCapture.Entry> tail = MapSyncLogCapture.tail(50);
+		if (tail.isEmpty()) {
+			report.append("  (none)\n");
+		}
+		else {
+			for (final MapSyncLogCapture.Entry e : tail) {
+				for (final String line : e.formatted().split("\\r?\\n")) {
+					report.append("  ").append(line).append('\n');
+				}
+			}
+		}
+
+		final String filename = "diagnose-"
+			+ java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")
+				.withZone(java.time.ZoneId.systemDefault())
+				.format(java.time.Instant.now())
+			+ ".txt";
+		final java.nio.file.Path outPath = state.dataDir().resolve(filename);
+		try {
+			java.nio.file.Files.createDirectories(outPath.getParent());
+			java.nio.file.Files.writeString(outPath, report.toString());
+		}
+		catch (final Exception e) {
+			src.sendFailure(text("Failed to write diagnostic file: " + e.getMessage(), ChatFormatting.RED));
+			return 0;
+		}
+
+		src.sendSuccess(() -> header("MapSync diagnose"), false);
+		src.sendSuccess(() -> kv("report saved", outPath.toString()), false);
+		src.sendSuccess(() -> kv("captured chunks", Long.toString(capture.capturedCount())), false);
+		src.sendSuccess(() -> kv("scan", scanner == null ? "n/a" : scanner.status().toString()), false);
+		src.sendSuccess(() -> kv("active clients", Integer.toString(ws == null ? 0 : ws.activeClients().size())), false);
+		src.sendSuccess(() -> muted("Paste the .txt file contents to share the full report."), false);
+		return 1;
 	}
 
 	private static int handleRescan(
@@ -223,6 +332,13 @@ public final class MapSyncCommand {
 				.append(text(dim, ChatFormatting.WHITE))
 				.append(text("  via=", ChatFormatting.DARK_GRAY))
 				.append(text(addr, ChatFormatting.WHITE)), false);
+			src.sendSuccess(() -> text("     packets ", ChatFormatting.DARK_GRAY)
+				.append(text("in=" + client.packetsReceived.get()
+					+ " out=" + client.packetsSent.get()
+					+ "  chunks in=" + client.chunkTilesReceived.get()
+					+ " out=" + client.chunkTilesSentToClient.get()
+					+ "  catchup-batches=" + client.catchupBatchesFulfilled.get(),
+					ChatFormatting.GRAY)), false);
 		}
 		return clients.size();
 	}

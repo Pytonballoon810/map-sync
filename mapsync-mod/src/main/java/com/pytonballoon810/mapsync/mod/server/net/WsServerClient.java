@@ -8,6 +8,7 @@ import com.pytonballoon810.mapsync.mod.server.MsServerLog;
 import com.pytonballoon810.mapsync.mod.server.net.auth.ServerAuthState;
 import com.pytonballoon810.mapsync.mod.utils.MagicValues;
 import java.io.ByteArrayOutputStream;
+import java.util.concurrent.atomic.AtomicLong;
 import net.minecraft.resources.Identifier;
 
 import org.jetbrains.annotations.NotNull;
@@ -33,6 +34,17 @@ public final class WsServerClient {
 	public volatile @NotNull ServerAuthState auth = new ServerAuthState.AwaitingHandshake();
 	public volatile @Nullable String gameAddress = null;
 	public volatile @Nullable Identifier dimension = null;
+
+	// Per-connection traffic counters used by /mapsync clients list and
+	// /mapsync diagnose. All are written from the websocket worker
+	// thread(s) and read from the main / chat thread when the operator
+	// runs a command; AtomicLong gives us monotonic semantics without
+	// requiring a lock on the read path.
+	public final @NotNull AtomicLong packetsReceived = new AtomicLong();
+	public final @NotNull AtomicLong packetsSent = new AtomicLong();
+	public final @NotNull AtomicLong chunkTilesReceived = new AtomicLong();
+	public final @NotNull AtomicLong chunkTilesSentToClient = new AtomicLong();
+	public final @NotNull AtomicLong catchupBatchesFulfilled = new AtomicLong();
 
 	WsServerClient(
 		final @NotNull WebSocket conn,
@@ -98,6 +110,7 @@ public final class WsServerClient {
 		}
 		try {
 			this.conn.send(wireBytes);
+			this.packetsSent.incrementAndGet();
 		}
 		catch (final WebsocketNotConnectedException ignored) {
 			// Close race; nothing to do.

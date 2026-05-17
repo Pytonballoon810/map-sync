@@ -122,6 +122,7 @@ public final class ProtocolHandler {
 		final @NotNull WsServerClient client,
 		final @NotNull ServerChunkTileFrame frame
 	) {
+		client.chunkTilesReceived.incrementAndGet();
 		if (!(client.auth instanceof final ServerAuthState.Welcomed welcomed)) {
 			client.kick("chunk-tile before welcome");
 			return;
@@ -161,6 +162,8 @@ public final class ProtocolHandler {
 			if (other == null || other == sender || !other.isWelcomed()) continue;
 			try {
 				conn.send(wireBytes);
+				other.packetsSent.incrementAndGet();
+				other.chunkTilesSentToClient.incrementAndGet();
 			}
 			catch (final WebsocketNotConnectedException ignored) {
 				// Close race — drop the relay silently.
@@ -351,6 +354,8 @@ public final class ProtocolHandler {
 			return;
 		}
 		final String dimensionString = packet.dimension().toString();
+		client.catchupBatchesFulfilled.incrementAndGet();
+		int sent = 0;
 		for (final Map.Entry<ChunkPos, Long> entry : packet.chunks().entrySet()) {
 			final ChunkPos pos = entry.getKey();
 			final long requestedTs = entry.getValue();
@@ -371,7 +376,9 @@ public final class ProtocolHandler {
 			// our copy is older the client already has a newer one.
 			if (stored.get().timestamp() != requestedTs) continue;
 			sendRawChunkTilePacket(client, dimensionString, pos.x(), pos.z(), stored.get());
+			sent++;
 		}
+		client.chunkTilesSentToClient.addAndGet(sent);
 	}
 
 	/// Emits a ChunkTilePacket wire form constructed directly from stored

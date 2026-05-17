@@ -144,6 +144,7 @@ public final class MapSyncWsServer extends WebSocketServer {
 		if (!conn.isOpen()) {
 			return;
 		}
+		client.packetsReceived.incrementAndGet();
 		// Capture the full frame before any read advances `message.position`.
 		// ChunkTilePackets are relayed verbatim to other clients without
 		// re-encoding, so we hand these original bytes to the protocol
